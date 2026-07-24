@@ -22,6 +22,7 @@ export async function POST(request: Request) {
     if (elapsed < 1_500 || elapsed > 86_400_000) return NextResponse.json({ error: "Please reload the page and try again." }, { status: 400 });
 
     const payload = {
+      deliveryId: await createDeliveryId(input),
       name: input.name,
       businessName: input.businessName,
       email: input.email,
@@ -58,19 +59,30 @@ export async function POST(request: Request) {
     }
 
     if (!delivered && discordUrl) {
+      const fields = [
+        { name: "Delivery ID", value: payload.deliveryId, inline: false },
+        { name: "Name", value: payload.name, inline: true },
+        { name: "Business", value: payload.businessName, inline: true },
+        { name: "Email", value: payload.email, inline: false },
+        { name: "Service", value: payload.service, inline: true },
+        { name: "Submitted at", value: payload.submittedAt, inline: false }
+      ];
+      if (payload.phone) fields.splice(4, 0, { name: "Phone", value: payload.phone, inline: true });
+      if (payload.website) fields.splice(fields.length - 2, 0, { name: "Website", value: payload.website, inline: false });
       const response = await fetch(discordUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           allowed_mentions: { parse: [] },
-          content: [
-            "**New Agency Foundry consultation request**",
-            `Business: **${discordSafe(payload.businessName)}**`,
-            `Contact: ${discordSafe(payload.name)} · ${discordSafe(payload.email)}${payload.phone ? ` · ${discordSafe(payload.phone)}` : ""}`,
-            `Interested in: ${discordSafe(payload.service)}`,
-            payload.website ? `Website: ${discordSafe(payload.website)}` : "Website: not provided",
-            `Message: ${discordSafe(payload.message).slice(0, 900)}`
-          ].join("\n")
+          content: "**New Agency Foundry consultation request**",
+          embeds: [{
+            title: payload.businessName,
+            description: payload.message,
+            color: 0xf15a4a,
+            fields,
+            footer: { text: "agency-foundry-consultation:v1" },
+            timestamp: payload.submittedAt
+          }]
         }),
         signal: AbortSignal.timeout(8_000)
       });
@@ -90,13 +102,21 @@ export async function POST(request: Request) {
   }
 }
 
+async function createDeliveryId(input: z.infer<typeof IntakeSchema>): Promise<string> {
+  const source = JSON.stringify([
+    input.email.toLowerCase(),
+    input.businessName.toLowerCase(),
+    input.message,
+    input.startedAt
+  ]);
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(source));
+  const hex = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `afc_${hex.slice(0, 32)}`;
+}
+
 function sameOrigin(request: Request): boolean {
   const origin = request.headers.get("origin");
   const host = request.headers.get("x-forwarded-host") || request.headers.get("host");
   if (!origin || !host) return process.env.NODE_ENV !== "production";
   try { return new URL(origin).host === host; } catch { return false; }
-}
-
-function discordSafe(value: string): string {
-  return value.replaceAll("@", "@\u200b").replaceAll("`", "'").trim();
 }

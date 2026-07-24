@@ -14,7 +14,7 @@ Open `http://localhost:3100`.
 The form deliberately returns an error when no private delivery destination is configured. For local form delivery, copy `.env.example` to `.env.local` and configure either:
 
 - `AGENCY_INTAKE_WEBHOOK_URL` plus the matching `INBOUND_WEBHOOK_SECRET`; or
-- the existing private `DISCORD_WEBHOOK_URL` as a server-only fallback.
+- a channel-scoped `DISCORD_WEBHOOK_URL` as a server-only relay when the worker stays private. The local worker imports the structured Discord message into its database using the configured bot and channel.
 
 Do not prefix the Discord webhook or webhook secret with `NEXT_PUBLIC_`.
 
