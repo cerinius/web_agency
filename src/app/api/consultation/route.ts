@@ -37,6 +37,7 @@ export async function POST(request: Request) {
 
     const workerUrl = process.env.AGENCY_INTAKE_WEBHOOK_URL;
     const discordUrl = process.env.DISCORD_WEBHOOK_URL;
+    const relayBotUserId = process.env.DISCORD_RELAY_BOT_USER_ID;
     let delivered = false;
     let workerError: string | undefined;
 
@@ -73,8 +74,8 @@ export async function POST(request: Request) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          allowed_mentions: { parse: [] },
-          content: "**New Agency Foundry consultation request**",
+          allowed_mentions: relayBotUserId ? { users: [relayBotUserId] } : { parse: [] },
+          content: `${relayBotUserId ? `<@${relayBotUserId}> ` : ""}**New Agency Foundry consultation request**`,
           embeds: [{
             title: payload.businessName,
             description: payload.message,
